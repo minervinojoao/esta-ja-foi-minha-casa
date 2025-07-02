@@ -14,16 +14,9 @@
       overflow: hidden;
     }
 
-    .fullscreen {
-      position: relative;
+    #streetview {
       width: 100vw;
       height: 100vh;
-    }
-
-    .photo img {
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
     }
 
     .caption {
@@ -37,6 +30,7 @@
       font-size: 1.5rem;
       font-weight: bold;
       border-radius: 10px;
+      z-index: 5;
     }
 
     .buttons-overlay {
@@ -56,13 +50,6 @@
       border: none;
       border-radius: 5px;
       background-color: rgba(255, 255, 255, 0.9);
-    }
-
-    .nav-buttons {
-      position: absolute;
-      bottom: 1rem;
-      right: 1rem;
-      z-index: 10;
     }
 
     .modal {
@@ -86,24 +73,15 @@
   </style>
 </head>
 <body>
-  <div class="fullscreen">
-    <div class="buttons-overlay">
-      <button onclick="openModal('add')">Adicionar minha casa</button>
-      <button onclick="openModal('info')">Informações</button>
-    </div>
+  <div id="streetview"></div>
 
-    <div class="nav-buttons">
-      <button onclick="prevPhoto()">⟨</button>
-      <button onclick="nextPhoto()">⟩</button>
-    </div>
+  <div class="caption" id="caption" style="display: none;">
+    esta já foi minha casa
+  </div>
 
-    <div class="photo" id="photo-container">
-      <!-- Imagem exibida aqui -->
-    </div>
-
-    <div class="caption" id="caption" style="display: none;">
-      esta já foi minha casa
-    </div>
+  <div class="buttons-overlay">
+    <button onclick="openModal('add')">Adicionar minha casa</button>
+    <button onclick="openModal('info')">Informações</button>
   </div>
 
   <!-- Modal Adicionar -->
@@ -112,7 +90,7 @@
       <h2>Adicionar uma casa</h2>
       <label for="address">Endereço:</label><br>
       <input type="text" id="address" placeholder="Rua, cidade, estado" style="width: 100%;" /><br><br>
-      <button onclick="addPhoto()">Enviar</button>
+      <button onclick="loadStreetView()">Enviar</button>
       <button onclick="closeModal('add')">Cancelar</button>
     </div>
   </div>
@@ -121,15 +99,14 @@
   <div class="modal" id="info-modal">
     <div class="modal-content">
       <h2>Sobre o projeto</h2>
-      <p>Este site é um espaço de memória. Pessoas podem compartilhar imagens de lugares que um dia foram suas casas. Cada imagem traz a frase "esta já foi minha casa" como testemunho do tempo.</p>
+      <p>Este site é um espaço de memória. Pessoas podem compartilhar imagens de lugares que um dia foram suas casas. Cada visualização traz a frase "esta já foi minha casa" como testemunho do tempo.</p>
       <button onclick="closeModal('info')">Fechar</button>
     </div>
   </div>
 
   <script>
     const apiKey = "AIzaSyBa_JqRXdX_Tc9QF5PvNlDUjT0dxmR0sj4";
-    const images = [];
-    let currentIndex = -1;
+    let panorama;
 
     function openModal(type) {
       document.getElementById(`${type}-modal`).style.display = 'flex';
@@ -139,56 +116,44 @@
       document.getElementById(`${type}-modal`).style.display = 'none';
     }
 
-    function addPhoto() {
+    function loadStreetView() {
       const address = document.getElementById("address").value.trim();
       if (!address) {
         alert("Por favor, insira um endereço.");
         return;
       }
 
-      const encoded = encodeURIComponent(address);
-      const imageUrl = `https://maps.googleapis.com/maps/api/streetview?size=1280x720&location=${encoded}&key=${apiKey}`;
-
-      images.push(imageUrl);
-      currentIndex = images.length - 1;
-      showPhoto();
+      fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === "OK") {
+            const location = data.results[0].geometry.location;
+            showPanorama(location.lat, location.lng);
+          } else {
+            alert("Endereço não encontrado.");
+          }
+        });
 
       closeModal('add');
       document.getElementById("address").value = "";
     }
 
-    function showPhoto() {
-      const photoContainer = document.getElementById("photo-container");
-      const caption = document.getElementById("caption");
-
-      if (images.length === 0 || currentIndex < 0 || currentIndex >= images.length) {
-        photoContainer.innerHTML = "";
-        caption.style.display = "none";
-        return;
-      }
-
-      const img = document.createElement("img");
-      img.src = images[currentIndex];
-      img.alt = "Foto da casa";
-
-      photoContainer.innerHTML = "";
-      photoContainer.appendChild(img);
-      caption.style.display = "block";
-    }
-
-    function nextPhoto() {
-      if (currentIndex < images.length - 1) {
-        currentIndex++;
-        showPhoto();
-      }
-    }
-
-    function prevPhoto() {
-      if (currentIndex > 0) {
-        currentIndex--;
-        showPhoto();
+    function showPanorama(lat, lng) {
+      document.getElementById("caption").style.display = "block";
+      if (!panorama) {
+        panorama = new google.maps.StreetViewPanorama(
+          document.getElementById("streetview"),
+          {
+            position: { lat, lng },
+            pov: { heading: 0, pitch: 0 },
+            zoom: 1
+          }
+        );
+      } else {
+        panorama.setPosition({ lat, lng });
       }
     }
   </script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBa_JqRXdX_Tc9QF5PvNlDUjT0dxmR0sj4"></script>
 </body>
 </html>
